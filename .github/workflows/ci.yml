@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Every action is pinned to a commit SHA; the tag is in the comment.
+jobs:
+  phpt:
+    name: PHPT (PHP ${{ matrix.php }} NTS, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container: php:${{ matrix.php }}-cli
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.3", "8.4", "8.5"]
+        arch: [x86-64, arm64]
+        include:
+          - arch: x86-64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      # Without git in the image, checkout downloads the API archive instead of cloning, and the
+      # archive leaves out the export-ignore paths (.github/, tests/, fuzz/).
+      - name: Install git, so that checkout makes a clone
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check that the checkout holds tests/ and .github/ci/
+        run: |
+          if [ ! -d tests ] || [ ! -d .github/ci ]; then
+            echo "::error::tests/ or .github/ci/ is missing: the checkout is the export-ignore archive, not a clone"
+            exit 1
+          fi
+      - name: Build, check warnings and symbols, run PHPT
+        run: bash .github/ci/phpt.sh
+        env:
+          BF_EXPECT_ZTS: "0"
+          BF_TEST_JOBS: "4"
+
+  # PHP 8.6 NTS from the pinned pre-release, because php:8.6-rc-cli is a ZTS build.
+  # Non-blocking until PHP 8.6.0 is released (2026-11-19): continue-on-error keeps a red lane from failing
+  # the workflow. After the release, pin the 8.6.0 tarball, drop continue-on-error and make this lane required.
+  phpt-86:
+    name: PHPT (PHP 8.6.0RC5 NTS from source, ${{ matrix.arch }}, non-blocking)
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: true
+    container: debian:trixie-slim
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86-64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      PHP_VERSION: 8.6.0RC5
+      PHP_URL: https://downloads.php.net/~svpernova09/php-8.6.0RC5.tar.xz
+      PHP_SHA256: abd7e3a652cfec56a2904abef7e8f37206fa07a8c1505a5a8a9bfdd25a1f1ba9
+    steps:
+      - name: Install git, so that checkout makes a clone
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build PHP, build the extension, check warnings and symbols, run PHPT
+        run: bash .github/ci/phpt-source.sh
+
+  # ASan + UBSan PHPT with and without the Zend allocator, a UBSan-only run, and the fuzz corpus replay.
+  sanitizer:
+    name: ASan/UBSan, UBSan, fuzz corpus replay (PHP 8.3.36 debug, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container: debian:trixie-slim
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86-64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Install git, so that checkout makes a clone
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build PHP with sanitizers and run the suites
+        run: bash .github/ci/sanitizer.sh
+        env:
+          BF_TEST_JOBS: "4"
+      - name: Keep the logs of a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sanitizer-logs-${{ matrix.arch }}
+          path: sanitizer-logs/
+          if-no-files-found: ignore
+
+  # Provisional ZTS lane. ZTS is not advertised or supported (SPEC 8, composer.json support-zts false);
+  # this only records whether it builds and passes. continue-on-error: a red lane does not fail the workflow.
+  zts:
+    name: PHPT (PHP 8.3 ZTS, x86-64, provisional)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    container: php:8.3-zts
+    steps:
+      - name: Install git, so that checkout makes a clone
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build, check warnings and symbols, run PHPT
+        run: bash .github/ci/phpt.sh
+        env:
+          BF_EXPECT_ZTS: "1"

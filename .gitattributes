@@ -1,0 +1,5 @@
+# Left out of `git archive`, and so of the source package PIE builds from.
+/tests export-ignore
+/fuzz export-ignore
+/benchmarks export-ignore
+/.github export-ignore

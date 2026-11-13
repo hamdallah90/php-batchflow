@@ -1,0 +1,25 @@
+{
+    "name": "hamdallah90/batchflow",
+    "type": "php-ext",
+    "description": "Native CSV scan, filter, aggregate and group-by for PHP, with bounded memory and an optional preloaded column Table.",
+    "keywords": [
+        "csv",
+        "etl",
+        "aggregate",
+        "group-by",
+        "php-extension",
+        "pie"
+    ],
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3 <8.7"
+    },
+    "php-ext": {
+        "extension-name": "batchflow",
+        "support-zts": false,
+        "os-families": [
+            "linux",
+            "darwin"
+        ]
+    }
+}
