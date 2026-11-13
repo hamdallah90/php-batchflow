@@ -4,6 +4,8 @@ BatchFlow is a PHP extension written in C. It scans CSV files and streams withou
 It filters rows, counts, sums, groups and aggregates in native code, and returns only the result to PHP.
 Memory use stays flat, whatever the file size.
 
+JSON input (NDJSON and top-level JSON arrays) with the same API is coming soon.
+
 ## Requirements
 
 - PHP 8.3, 8.4 and 8.5, and 8.6 (pre-release builds until PHP 8.6.0 is released), non-thread-safe (NTS) builds. Thread-safe (ZTS) builds are not supported: CI runs a provisional ZTS lane that is allowed to fail, and nothing in this project claims ZTS works.
@@ -13,6 +15,16 @@ Memory use stays flat, whatever the file size.
 
 ## Install and build
 
+With [PIE](https://github.com/php/pie):
+
+```sh
+pie install hamdallah90/batchflow
+```
+
+On minimal images such as `php:8.3-cli`, install `libtool` first, because PIE builds with `phpize`. The PIE metadata is in `composer.json`: Linux and macOS, NTS only, PHP 8.3 up to 8.6.
+
+To build from source:
+
 ```sh
 phpize
 ./configure --enable-batchflow
@@ -20,14 +32,6 @@ make
 make test
 sudo make install
 ```
-
-With [PIE](https://github.com/php/pie), once the package is published:
-
-```sh
-pie install hamdallah90/batchflow
-```
-
-On minimal images such as `php:8.3-cli`, install `libtool` first, because PIE builds with `phpize`. The PIE metadata is in `composer.json`: Linux and macOS, NTS only, PHP 8.3 up to 8.6.
 
 Then add this line to your `php.ini`:
 
